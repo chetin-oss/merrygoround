@@ -1,5 +1,6 @@
 import * as THREE from './vendor/three.module.js';
 import { Music } from './music.js';
+import { addChristmas, roofTex, valanceTex, floorTex as snowFloorTex } from './xmas.js';
 
 const $ = id => document.getElementById(id);
 const APP_ID = 'merry-go-round-chase-kr';
@@ -7,7 +8,19 @@ const OMEGA = 0.6;            // carousel speed (rad/s), shared by everyone thro
 const NH = 12, HR = 4.8, FR = 7.6;
 const NPC = 'npc';
 const params = new URLSearchParams(location.search);
-const ROOM = (params.get('room') || 'plaza').slice(0, 32);
+// rooms: the open plaza, or a private 4-digit friend code (?code=4821) that puts friends together
+let CODE = (params.get('code') || '').replace(/\D/g, '').slice(0, 4);
+if (CODE.length !== 4) CODE = '';
+let ROOM = CODE ? `code-${CODE}` : (params.get('room') || 'plaza').slice(0, 32);
+let isHost = false;   // I made this code
+let seekHost = 0;     // seconds left to find my friend's horse after joining by code
+const roomLabel = () => CODE ? `방 코드 ${CODE}` : ROOM === 'plaza' ? '광장' : `방 ${ROOM}`;
+const newCode = () => String(1000 + Math.floor(Math.random() * 9000));
+function inviteURL() {
+  const u = new URL(location.href);
+  u.search = CODE ? `?code=${CODE}` : ROOM === 'plaza' ? '' : `?room=${encodeURIComponent(ROOM)}`; u.hash = '';
+  return u.href;
+}
 const wallT = () => (Date.now() / 1000) % 100000;
 
 // ---------------------------------------------------------------- renderer
@@ -15,8 +28,8 @@ const canvas = $('stage');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x120d1c);
-scene.fog = new THREE.Fog(0x120d1c, 22, 60);
+scene.background = new THREE.Color(0x10142a);
+scene.fog = new THREE.Fog(0x10142a, 24, 62);
 const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 200);
 function resize() {
   const w = innerWidth, h = innerHeight;
@@ -46,7 +59,7 @@ const stripeTex = canvasTex(512, 64, (g, w, h) => {
   for (let i = 0; i < 16; i++) { g.fillStyle = i % 2 ? '#f3e6c8' : '#c8352a'; g.fillRect(i * w / 16, 0, w / 16 + 1, h); }
 });
 
-const ground = new THREE.Mesh(new THREE.CircleGeometry(60, 64), new THREE.MeshLambertMaterial({ map: floorTex }));
+const ground = new THREE.Mesh(new THREE.CircleGeometry(60, 64), new THREE.MeshLambertMaterial({ map: (snowFloorTex.repeat.set(18, 18), snowFloorTex) }));
 ground.rotation.x = -Math.PI / 2; scene.add(ground);
 
 // ---------------------------------------------------------------- carousel
@@ -58,14 +71,14 @@ base.position.y = 0.25; scene.add(base);
 const deck = new THREE.Mesh(new THREE.CylinderGeometry(6.4, 6.4, 0.12, 48), new THREE.MeshLambertMaterial({ color: 0x8a5a3a }));
 deck.position.y = 0.56; spin.add(deck);
 const pillar = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.1, 5.2, 16),
-  new THREE.MeshStandardMaterial({ color: 0xb8a3d6, metalness: .8, roughness: .2, emissive: 0x2a1d3a }));
+  new THREE.MeshStandardMaterial({ color: 0xead9b0, metalness: .55, roughness: .3, emissive: 0x3a2a10 }));
 pillar.position.y = 3.1; spin.add(pillar);
 const valance = new THREE.Mesh(new THREE.CylinderGeometry(6.6, 6.6, 0.8, 48, 1, true),
-  new THREE.MeshLambertMaterial({ map: stripeTex, side: THREE.DoubleSide }));
-valance.position.y = 5.5; spin.add(valance);
-const roof = new THREE.Mesh(new THREE.ConeGeometry(7, 2.6, 48, 1, true), new THREE.MeshLambertMaterial({ map: stripeTex, side: THREE.DoubleSide }));
+  new THREE.MeshLambertMaterial({ map: valanceTex, side: THREE.DoubleSide, transparent: true, alphaTest: 0.5 }));
+valance.position.y = 5.45; spin.add(valance);
+const roof = new THREE.Mesh(new THREE.ConeGeometry(7, 2.6, 48, 1, true), new THREE.MeshLambertMaterial({ map: roofTex, side: THREE.DoubleSide }));
 roof.position.y = 7.2; spin.add(roof);
-const finial = new THREE.Mesh(new THREE.SphereGeometry(0.35, 16, 12), gold); finial.position.y = 8.7; spin.add(finial);
+const finial = new THREE.Mesh(new THREE.SphereGeometry(0.35, 16, 12), gold); finial.position.y = 8.6; spin.add(finial);
 
 const bulbGeo = new THREE.SphereGeometry(0.09, 8, 6);
 const bulbMatA = new THREE.MeshBasicMaterial({ color: 0xffd27a }), bulbMatB = new THREE.MeshBasicMaterial({ color: 0xffd27a });
@@ -78,6 +91,7 @@ for (let i = 0; i < nB; i++) {
   (i % 2 ? bulbsB : bulbsA).setMatrixAt(i >> 1, m4);
 }
 spin.add(bulbsA, bulbsB);
+const xmasTick = addChristmas(scene, spin, [bulbMatA, bulbMatB]);
 
 const box = (w, h, d, mat) => new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
 function makeHorse(color) {
@@ -235,10 +249,10 @@ const onlineEl = $('online');
 function updateOnline() {
   if (!net) { onlineEl.textContent = navigator.onLine === false ? '오프라인 · 혼자 모드' : '연결 중…'; return; }
   const n = net.peers.size + 1;
-  onlineEl.textContent = `방 ${ROOM} · ${n}명 접속` + (n === 1 ? ' (다른 사람을 찾는 중…)' : '');
+  onlineEl.textContent = `${roomLabel()} · ${n}명 접속` + (n === 1 ? ' (다른 사람을 찾는 중…)' : '');
 }
 function myState() {
-  return { n: me.name, r: me.role, h: me.horse, x: +me.x.toFixed(2), z: +me.z.toFixed(2), f: +me.face.toFixed(2), w: me.wave > 0 ? 1 : 0, rs: me.rest ? 1 : 0 };
+  return { n: me.name, r: me.role, h: me.horse, x: +me.x.toFixed(2), z: +me.z.toFixed(2), f: +me.face.toFixed(2), w: me.wave > 0 ? 1 : 0, rs: me.rest ? 1 : 0, hc: isHost ? 1 : 0 };
 }
 async function connect() {
   try {
@@ -268,6 +282,14 @@ async function connect() {
     onlineEl.textContent = '혼자 모드 (연결 실패)';
   }
 }
+async function switchRoom(code) {
+  CODE = code; ROOM = `code-${code}`;
+  try { history.replaceState(null, '', `?code=${code}`); } catch (e) {}
+  if (net) { try { net.room.leave(); } catch (e) {} }
+  for (const id of [...players.keys()]) if (id !== 'self' && id !== NPC) removeEntity(id);
+  net = null; updateOnline(); renderRoomInfo();
+  await connect();
+}
 const send = (k, d) => { try { if (net && joined) net[k].send(d); } catch (e) {} };
 
 function onState(pid, d) {
@@ -281,7 +303,7 @@ function onState(pid, d) {
     if (role === 'chase') { e.x = e.tx = +d.x || 9; e.z = e.tz = +d.z || 0; }
     setRole(e, role, d.h);
   }
-  e.tx = +d.x || 0; e.tz = +d.z || 0; e.tf = +d.f || 0; e.wave = d.w ? 1 : 0; e.rest = !!d.rs;
+  e.tx = +d.x || 0; e.tz = +d.z || 0; e.tf = +d.f || 0; e.wave = d.w ? 1 : 0; e.rest = !!d.rs; e.host = !!d.hc;
   if (e.fresh) { e.x = e.tx; e.z = e.tz; e.face = e.tf; e.fresh = false; }
   updateOnline();
 }
@@ -351,7 +373,26 @@ function showBanner(big, small, sec) {
 function showToast(t, sec = 2) { toast.textContent = t; toast.hidden = false; toastT = sec; }
 function bubble(e, text, sec, reply) { e.bubble.textContent = text; e.bubble.classList.toggle('r', !!reply); e.bubble.hidden = false; e.bubbleT = sec; }
 
-$('roomInfo').textContent = `방 이름: ${ROOM} · 같은 링크로 들어온 사람끼리 만나요. 주소 끝에 ?room=우리반 처럼 붙이면 따로 방을 만들 수 있어요.`;
+function renderRoomInfo() {
+  $('roomInfo').textContent = CODE
+    ? `들어갈 방: 방 코드 ${CODE}${isHost ? ' (내가 만든 방)' : ''}. 같은 코드로 들어온 사람끼리 만나요.`
+    : '코드 없이 들어가면 모두가 모이는 광장으로 가요.';
+  if (!lastAsker) $('asked').textContent = CODE
+    ? `짝 코드 ${CODE} · 친구가 이 코드로 들어오면 바로 옆에서 시작해요`
+    : '밖에서 누가 부르면 여기에 이름이 떠요';
+}
+$('codeIn').value = CODE;
+renderRoomInfo();
+async function copyInvite(prefix) {
+  const url = inviteURL();
+  try { await navigator.clipboard.writeText(url); showToast(`${prefix}링크를 복사했어요. 친구에게 보내 주세요`, 3); }
+  catch (e) { showToast(`${prefix}${url}`, 5); }
+}
+$('newCode').addEventListener('click', () => {
+  const c = newCode(); $('codeIn').value = c; isHost = true;
+  switchRoom(c); copyInvite(`방 코드 ${c} · `);
+});
+$('codeIn').addEventListener('input', () => { const v = $('codeIn').value.replace(/\D/g, '').slice(0, 4); $('codeIn').value = v; });
 
 function pickHorse() {
   const taken = new Set([0]);
@@ -386,6 +427,10 @@ $('joinForm').addEventListener('submit', ev => {
   if (!name) name = '손님' + Math.floor(1000 + Math.random() * 9000);
   try { localStorage.setItem('mgr-name', name); } catch (e) {}
   setName(me, name);
+  const code = $('codeIn').value.replace(/\D/g, '');
+  if (code.length === 4 && code !== CODE) { isHost = false; switchRoom(code); }
+  else if (code.length > 0 && code.length !== 4) { showToast('친구 코드는 숫자 4자리예요'); return; }
+  if (code.length === 4 && !isHost && role === 'chase') seekHost = 10;
   joined = true;
   me.person.g.visible = true; me.tag.hidden = false; me.blob.visible = true;
   $('intro').hidden = true;
@@ -394,8 +439,12 @@ $('joinForm').addEventListener('submit', ev => {
 });
 $('switchRole').addEventListener('click', () => { if (!joined) return; me.role === 'ride' ? becomeChaser() : becomeRider(); });
 $('share').addEventListener('click', async () => {
-  try { await navigator.clipboard.writeText(location.href); showToast('링크를 복사했어요. 친구에게 보내 주세요'); }
-  catch (e) { showToast(location.href, 4); }
+  if (!CODE) {           // in the open plaza: make a private room for me and my friends first
+    const c = newCode(); isHost = true; $('codeIn').value = c;
+    await switchRoom(c);
+    showBanner(`방 코드 ${c}`, '친구가 이 코드로 들어오면 같은 방에서 만나요', 3);
+  }
+  copyInvite(`방 코드 ${CODE} · `);
 });
 const musicBtn = $('music');
 musicBtn.addEventListener('click', () => { const on = Music.toggle(); musicBtn.textContent = on ? '음악 끄기' : '음악 켜기'; });
@@ -522,6 +571,7 @@ function animateWalker(e, dt, speed) {
 function tick() {
   const dt = Math.min(clock.getDelta(), 0.05), t = wallT();
   Music.update();
+  xmasTick(dt);
 
   spin.rotation.y = (t * OMEGA) % (Math.PI * 2);
   horses.forEach(o => { o.h.position.y = 1.55 + Math.sin(t * 2.2 + o.phase) * 0.35; });
@@ -532,6 +582,19 @@ function tick() {
 
   // rider world positions
   for (const p of players.values()) if (p.role === 'ride') p.person.g.getWorldPosition(p.wp);
+
+  // joined by a friend's code: start right outside their horse
+  if (seekHost > 0 && joined && me.role === 'chase') {
+    seekHost -= dt;
+    let f = null;
+    for (const p of players.values()) if (!p.self && !p.npc && p.role === 'ride' && (!f || p.host)) f = p;
+    if (f && (f.wp.x || f.wp.z)) {
+      const a = Math.atan2(f.wp.z, f.wp.x) + 0.18;
+      me.x = 9 * Math.cos(a); me.z = 9 * Math.sin(a); me.vx = me.vz = 0;
+      camPos.set(me.x * 1.9, 5.2, me.z * 1.9);
+      seekHost = 0; showToast(`${f.name}님 바로 옆에서 시작해요. 같이 달리며 외쳐 보세요!`, 3);
+    } else if (seekHost <= 0) showToast('친구가 아직 목마에 안 탔어요. 탑승하면 이름표를 따라가세요', 3);
+  }
 
   // --- me as chaser
   if (joined && me.role === 'chase') {

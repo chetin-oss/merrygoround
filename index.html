@@ -28,7 +28,7 @@
 <div class="top-right">
   <button class="chip" id="music" type="button">음악 켜기</button>
   <button class="chip" id="switchRole" type="button">회전목마 타기</button>
-  <button class="chip" id="share" type="button">링크 복사</button>
+  <button class="chip" id="share" type="button">친구 초대</button>
 </div>
 
 <div class="controls" id="chaseCtl" hidden>
@@ -57,10 +57,16 @@
 <div id="intro">
   <form class="card" id="joinForm">
     <h2>회전목마는 멈추지 않는다</h2>
-    <p>같은 링크로 들어온 사람들이 한 놀이공원에 모입니다. 목마에 올라탈지, 울타리 밖에서 쫓아갈지 고르세요.</p>
+    <p>목마에 올라탈지, 울타리 밖에서 쫓아갈지 고르세요. 친구와 같은 방에서 만나려면 같은 코드로 들어오면 돼요.</p>
     <label class="field" for="nameIn">내 이름
       <input id="nameIn" maxlength="10" autocomplete="nickname" placeholder="예: 송주">
     </label>
+    <div class="code-row">
+      <label class="field" for="codeIn">친구 코드 <span class="opt">없으면 비워 두세요</span>
+        <input id="codeIn" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" placeholder="숫자 4자리">
+      </label>
+      <button class="linkbtn" id="newCode" type="button">새 코드 만들기</button>
+    </div>
     <div class="roles">
       <button class="role" id="joinChase" type="submit" value="chase">
         <b>쫓아가기</b><span>울타리 밖에서 달리며<br>"너 나 좋아 싫어?!"</span>

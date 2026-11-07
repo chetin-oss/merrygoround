@@ -101,3 +101,11 @@ h1{margin:0;font-family:var(--display);font-weight:400;font-size:clamp(22px,6vw,
 #hearts{position:fixed;inset:0;z-index:6;pointer-events:none;overflow:hidden}
 #hearts span{position:absolute;top:-40px;color:#ff6fa5;text-shadow:0 0 10px rgba(255,111,165,.7);animation-name:fall;animation-timing-function:linear;animation-fill-mode:forwards}
 @keyframes fall{to{transform:translateY(110vh) rotate(25deg);opacity:.2}}
+
+/* friend code */
+.code-row{display:flex;gap:10px;align-items:flex-end}
+.code-row .field{flex:1;min-width:0}
+.code-row input{letter-spacing:.3em;font-variant-numeric:tabular-nums}
+.opt{font-size:11px;color:var(--muted);opacity:.8;margin-left:4px}
+.linkbtn{flex:none;font:13px var(--body);color:var(--bulb);background:transparent;border:1px solid var(--line);border-radius:10px;padding:11px 12px;cursor:pointer}
+.linkbtn:focus-visible{outline:3px solid var(--ink);outline-offset:2px}
