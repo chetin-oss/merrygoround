@@ -233,6 +233,45 @@ function setRole(e, role, horse) {
 const npc = makeEntity(NPC, '빨간 코트', { npc: true, coat: 0xe0412f, pants: 0x2a3a6a, longHair: true, long: true, scarfColor: 0xe0412f });
 setRole(npc, 'ride', 0);
 
+// ---- a runner NPC who never stops chasing the red coat.
+// Driven by the wall clock (like the carousel), so every player sees him in the same place doing the same thing.
+const RUNNER = 'runner';
+const runner = makeEntity(RUNNER, '직진남', { npc: true, coat: 0x2f6a3e, pants: 0x1e1e26, scarfColor: 0xc0202a });
+setRole(runner, 'chase');
+const RUN_CYCLE = 48, RUN_T = 30, REST_T = 36;          // run beside her 30s, pant 6s, sprint to catch up 12s
+const lagRun = c => 0.12 + 0.25 * Math.sin(c * 0.35) ** 2;
+function runnerLag(c) {
+  if (c < RUN_T) return lagRun(c);
+  const l30 = lagRun(RUN_T);
+  if (c < REST_T) return l30 + OMEGA * (c - RUN_T);      // he stands still while she keeps going
+  const l36 = l30 + OMEGA * (REST_T - RUN_T);
+  return l36 + (lagRun(0) - l36) * (c - REST_T) / (RUN_CYCLE - REST_T);
+}
+function runnerPos(t) {
+  const c = t % RUN_CYCLE, a = -t * OMEGA + runnerLag(c);   // red coat sits at angle -t*OMEGA
+  const r = 8.9 + 0.35 * Math.sin(t * 0.9);
+  return [r * Math.cos(a), r * Math.sin(a), c];
+}
+const RUNNER_SHOUTS = [3, 9, 15, 21, 27];
+let runnerSlot = -1;
+function runnerTick(t) {
+  const [x, z, c] = runnerPos(t);
+  const [x2, z2] = runnerPos(t + 0.1);
+  runner.tx = x; runner.tz = z;
+  if (c < RUN_T || c >= REST_T) runner.tf = Math.atan2(x2 - x, z2 - z);
+  runner.rest = c >= RUN_T && c < REST_T;
+  if (runner.fresh) { runner.x = x; runner.z = z; runner.face = runner.tf; runner.fresh = false; }
+  // shout on a fixed schedule; her answer is picked from the slot number so everyone sees the same one
+  const k = RUNNER_SHOUTS.findIndex(s => c >= s && c < s + 0.5);
+  const slot = k < 0 ? -1 : Math.floor(t / RUN_CYCLE) * 10 + k;
+  if (slot >= 0 && slot !== runnerSlot) {
+    runnerSlot = slot;
+    bubble(runner, '빨간 코트 너 나 좋아 싫어?!', 2.2);
+    const answers = ['직진남, 몰라~', '직진남, 싫어!', '직진남, 한 바퀴만 더!', '직진남, 뭐야 진짜~', '직진남, …생각해 볼게'];
+    setTimeout(() => bubble(npc, answers[(slot * 7 + 3) % answers.length], 2.2, true), 600);
+  }
+}
+
 // me
 let myName = '';
 try { myName = localStorage.getItem('mgr-name') || ''; } catch (e) {}
@@ -291,7 +330,7 @@ async function switchRoom(code) {
   CODE = code; ROOM = `code-${code}`;
   try { history.replaceState(null, '', `?code=${code}`); } catch (e) {}
   if (net) { try { net.room.leave(); } catch (e) {} }
-  for (const id of [...players.keys()]) if (id !== 'self' && id !== NPC) removeEntity(id);
+  for (const id of [...players.keys()]) if (id !== 'self' && id !== NPC && id !== RUNNER) removeEntity(id);
   net = null; updateOnline(); renderRoomInfo();
   await connect();
 }
@@ -654,6 +693,7 @@ function tick() {
   camera.position.copy(camPos); camera.lookAt(camLook);
 
   // --- everyone else
+  runnerTick(t);
   for (const p of players.values()) {
     if (p.self) continue;
     if (p.role === 'chase') {
@@ -669,7 +709,7 @@ function tick() {
   // rider arms (wave)
   for (const p of players.values()) {
     if (p.role !== 'ride') continue;
-    const waving = p.npc ? (me.role === 'chase' && joined && riderNear(me.x, me.z) === npc) : p.wave > 0;
+    const waving = p.npc ? (me.role === 'chase' && joined && riderNear(me.x, me.z) === npc) || runner.bubbleT > 0 : p.wave > 0;
     const a = p.person.arms;
     // the right hand (arms[0]) is on the outside of the carousel, facing the people running round it
     a[1].rotation.set(-0.6, 0, -0.3);
