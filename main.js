@@ -231,8 +231,8 @@ let net = null;
 const onlineEl = $('online');
 function updateOnline() {
   if (!net) { onlineEl.textContent = navigator.onLine === false ? '오프라인 · 혼자 모드' : '연결 중…'; return; }
-  const n = [...players.values()].filter(p => !p.self && !p.npc).length + 1;
-  onlineEl.textContent = `방 ${ROOM} · ${n}명 접속`;
+  const n = net.peers.size + 1;
+  onlineEl.textContent = `방 ${ROOM} · ${n}명 접속` + (n === 1 ? ' (다른 사람을 찾는 중…)' : '');
 }
 function myState() {
   return { n: me.name, r: me.role, h: me.horse, x: +me.x.toFixed(2), z: +me.z.toFixed(2), f: +me.face.toFixed(2), w: me.wave > 0 ? 1 : 0 };
@@ -240,15 +240,25 @@ function myState() {
 async function connect() {
   try {
     const T = await import('./vendor/trystero.js');
-    const room = T.joinRoom({ appId: APP_ID }, ROOM);
-    net = { room, selfId: T.selfId,
+    const room = T.joinRoom({
+      appId: APP_ID,
+      // mobile carriers often block direct peer links; a TURN relay carries the traffic then
+      turnConfig: [{
+        urls: ['turn:openrelay.metered.ca:80', 'turn:openrelay.metered.ca:443', 'turn:openrelay.metered.ca:443?transport=tcp'],
+        username: 'openrelayproject', credential: 'openrelayproject',
+      }],
+    }, ROOM, {
+      onJoinError: d => { console.warn('peer join error', d); showToast('다른 사람과 직접 연결이 안 돼요 (네트워크 차단). 와이파이를 바꿔 보세요', 4); },
+    });
+    net = { room, selfId: T.selfId, peers: new Set(),
       st: room.makeAction('st'), sh: room.makeAction('sh'), rp: room.makeAction('rp'), lv: room.makeAction('lv') };
     net.st.onMessage = (d, { peerId }) => onState(peerId, d);
     net.sh.onMessage = (d, { peerId }) => onShout(peerId, d);
     net.rp.onMessage = (d, { peerId }) => onReply(peerId, d);
     net.lv.onMessage = (d, { peerId }) => onLove(peerId, d);
-    room.onPeerJoin = id => { if (joined) net.st.send(myState(), { target: id }); updateOnline(); };
-    room.onPeerLeave = id => { removeEntity(id); updateOnline(); };
+    room.onPeerJoin = id => { net.peers.add(id); if (joined) net.st.send(myState(), { target: id }); updateOnline(); };
+    room.onPeerLeave = id => { net.peers.delete(id); removeEntity(id); updateOnline(); };
+    window.__mgr = { net, players };
     updateOnline();
   } catch (err) {
     console.warn('멀티플레이 연결 실패, 혼자 모드로 진행', err);
