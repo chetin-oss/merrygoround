@@ -51,6 +51,7 @@ h1{margin:0;font-family:var(--display);font-weight:400;font-size:clamp(22px,6vw,
   background:rgba(246,236,216,.85);box-shadow:0 0 16px rgba(255,207,107,.5)}
 .btns{display:flex;flex-direction:column;gap:10px;align-items:flex-end;pointer-events:auto}
 .btn{font-family:var(--display);font-size:16px;color:var(--night);border:0;border-radius:999px;padding:14px 20px;cursor:pointer;touch-action:manipulation}
+#rest{background:var(--panel);color:var(--ink);border:1px solid var(--line);padding:10px 18px;font-size:14px}
 #shout{background:var(--coat);color:#fff;box-shadow:0 4px 0 #8c1f14}
 #run{background:var(--bulb);box-shadow:0 4px 0 #a5781c;padding:20px 26px;font-size:18px;touch-action:none}
 #run.on{transform:translateY(3px);box-shadow:0 1px 0 #a5781c}
@@ -94,3 +95,9 @@ h1{margin:0;font-family:var(--display);font-weight:400;font-size:clamp(22px,6vw,
 #joinChase{background:var(--coat);color:#fff;box-shadow:0 4px 0 #8c1f14}
 #joinRide{background:var(--bulb);color:var(--night);box-shadow:0 4px 0 #a5781c}
 @media (max-width:360px){.roles{grid-template-columns:1fr}}
+
+/* love event */
+#banner.love{color:#ffd0e2;font-size:clamp(24px,7.5vw,48px);text-shadow:0 0 28px rgba(255,90,150,.85),0 3px 0 #000}
+#hearts{position:fixed;inset:0;z-index:6;pointer-events:none;overflow:hidden}
+#hearts span{position:absolute;top:-40px;color:#ff6fa5;text-shadow:0 0 10px rgba(255,111,165,.7);animation-name:fall;animation-timing-function:linear;animation-fill-mode:forwards}
+@keyframes fall{to{transform:translateY(110vh) rotate(25deg);opacity:.2}}

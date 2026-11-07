@@ -19,7 +19,7 @@
     <span class="online" id="online">연결 중…</span>
   </div>
   <div class="meters" id="meters">
-    <label>마음</label><div class="bar" id="heart"><i></i></div>
+    <label id="yesLbl">확답 0/10</label><div class="bar" id="heart"><i></i></div>
     <label>체력</label><div class="bar" id="stam"><i></i></div>
   </div>
   <div class="hint" id="hint"></div>
@@ -34,6 +34,7 @@
 <div class="controls" id="chaseCtl" hidden>
   <div id="joy" aria-label="이동 조이스틱"><div id="knob"></div></div>
   <div class="btns">
+    <button class="btn" id="rest" type="button">쉬기</button>
     <button class="btn" id="shout" type="button">너 나 좋아 싫어?!</button>
     <button class="btn" id="run" type="button">전력질주</button>
   </div>
@@ -49,6 +50,7 @@
   </div>
 </div>
 
+<div id="hearts" hidden aria-hidden="true"></div>
 <div id="banner" hidden></div>
 <div id="toast" hidden></div>
 

@@ -136,27 +136,28 @@ function makePerson(o) {
   const hair = new THREE.MeshLambertMaterial({ color: o.hair || 0x1a1210 });
   const shoeM = new THREE.MeshLambertMaterial({ color: 0x111111 });
   const legs = [], arms = [];
+  const upper = new THREE.Group(); upper.position.y = 0.9; g.add(upper);   // everything above the hips
   for (const s of [-1, 1]) {
     const hip = new THREE.Group(); hip.position.set(0.15 * s, 0.9, 0);
     const leg = box(0.22, 0.9, 0.24, pants); leg.position.y = -0.45; hip.add(leg);
     const shoe = box(0.24, 0.12, 0.34, shoeM); shoe.position.set(0, -0.88, 0.06); hip.add(shoe);
     g.add(hip); legs.push(hip);
-    const sh = new THREE.Group(); sh.position.set(0.4 * s, 1.62, 0);
+    const sh = new THREE.Group(); sh.position.set(0.4 * s, 0.72, 0);
     const arm = box(0.18, 0.7, 0.2, coat); arm.position.y = -0.33; sh.add(arm);
     const hand = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 6), skin); hand.position.y = -0.72; sh.add(hand);
-    g.add(sh); arms.push(sh);
+    upper.add(sh); arms.push(sh);
   }
-  const torso = box(0.64, 0.82, 0.38, coat); torso.position.y = 1.3; g.add(torso);
+  const torso = box(0.64, 0.82, 0.38, coat); torso.position.y = 0.4; upper.add(torso);
   if (o.long) { const hem = box(0.7, 0.4, 0.42, coat); hem.position.y = 0.82; g.add(hem); }
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.26, 16, 12), skin); head.position.y = 1.98; g.add(head);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.26, 16, 12), skin); head.position.y = 1.08; upper.add(head);
   const hairM = new THREE.Mesh(new THREE.SphereGeometry(0.28, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.55), hair);
-  hairM.position.y = 2.0; hairM.rotation.x = -0.25; g.add(hairM);
-  if (o.longHair) { const back = box(0.5, 0.6, 0.12, hair); back.position.set(0, 1.75, -0.2); g.add(back); }
+  hairM.position.y = 1.1; hairM.rotation.x = -0.25; upper.add(hairM);
+  if (o.longHair) { const back = box(0.5, 0.6, 0.12, hair); back.position.set(0, 0.85, -0.2); upper.add(back); }
   const sm = new THREE.MeshLambertMaterial({ color: o.scarf || 0xf2ede6 });
-  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.08, 6, 12), sm); ring.rotation.x = Math.PI / 2; ring.position.y = 1.72; g.add(ring);
-  const scarf = new THREE.Group(); scarf.position.set(0.12, 1.7, -0.18);
-  const tail = box(0.16, 0.06, 0.7, sm); tail.position.z = -0.35; scarf.add(tail); g.add(scarf);
-  return { g, legs, arms, scarf };
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.08, 6, 12), sm); ring.rotation.x = Math.PI / 2; ring.position.y = 0.82; upper.add(ring);
+  const scarf = new THREE.Group(); scarf.position.set(0.12, 0.8, -0.18);
+  const tail = box(0.16, 0.06, 0.7, sm); tail.position.z = -0.35; scarf.add(tail); upper.add(scarf);
+  return { g, upper, legs, arms, scarf };
 }
 const blobGeo = new THREE.CircleGeometry(0.55, 20);
 const blobMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: .35 });
@@ -171,7 +172,7 @@ function makeEntity(id, name, o = {}) {
   const hv = hash(id);
   const e = {
     id, name, role: 'chase', horse: -1, self: !!o.self, npc: !!o.npc,
-    x: 0, z: 0, face: 0, tx: 0, tz: 0, tf: 0, vx: 0, vz: 0, spd: 0, walk: 0, wave: 0, bubbleT: 0, fresh: true,
+    x: 0, z: 0, face: 0, tx: 0, tz: 0, tf: 0, vx: 0, vz: 0, spd: 0, walk: 0, wave: 0, rest: false, restK: 0, bubbleT: 0, fresh: true,
     wp: new THREE.Vector3(),
   };
   e.person = makePerson({
@@ -202,12 +203,14 @@ function setRole(e, role, horse) {
     p.g.rotation.set(0, Math.PI / 2, 0); p.g.position.set(-0.05, -0.62, 0); p.g.scale.setScalar(0.9);
     p.legs.forEach((l, i) => { l.rotation.set(-1.25, 0, (i ? -1 : 1) * 0.35); });
     p.scarf.rotation.x = 0.3;
+    p.upper.rotation.set(0, 0, 0); p.upper.position.y = 0.9; e.rest = false; e.restK = 0;
     e.blob.visible = false;
   } else {
     e.role = 'chase';
     scene.add(p.g); p.g.scale.setScalar(1); p.g.rotation.set(0, e.face, 0);
     p.legs.forEach(l => l.rotation.set(0, 0, 0));
     p.arms.forEach(a => a.rotation.set(0, 0, 0));
+    p.upper.rotation.set(0, 0, 0); p.upper.position.y = 0.9; e.restK = 0;
     e.blob.visible = true;
   }
 }
@@ -235,7 +238,7 @@ function updateOnline() {
   onlineEl.textContent = `방 ${ROOM} · ${n}명 접속` + (n === 1 ? ' (다른 사람을 찾는 중…)' : '');
 }
 function myState() {
-  return { n: me.name, r: me.role, h: me.horse, x: +me.x.toFixed(2), z: +me.z.toFixed(2), f: +me.face.toFixed(2), w: me.wave > 0 ? 1 : 0 };
+  return { n: me.name, r: me.role, h: me.horse, x: +me.x.toFixed(2), z: +me.z.toFixed(2), f: +me.face.toFixed(2), w: me.wave > 0 ? 1 : 0, rs: me.rest ? 1 : 0 };
 }
 async function connect() {
   try {
@@ -251,11 +254,11 @@ async function connect() {
       onJoinError: d => { console.warn('peer join error', d); showToast('다른 사람과 직접 연결이 안 돼요 (네트워크 차단). 와이파이를 바꿔 보세요', 4); },
     });
     net = { room, selfId: T.selfId, peers: new Set(),
-      st: room.makeAction('st'), sh: room.makeAction('sh'), rp: room.makeAction('rp'), lv: room.makeAction('lv') };
+      st: room.makeAction('st'), sh: room.makeAction('sh'), rp: room.makeAction('rp'), ev: room.makeAction('ev') };
     net.st.onMessage = (d, { peerId }) => onState(peerId, d);
     net.sh.onMessage = (d, { peerId }) => onShout(peerId, d);
     net.rp.onMessage = (d, { peerId }) => onReply(peerId, d);
-    net.lv.onMessage = (d, { peerId }) => onLove(peerId, d);
+    net.ev.onMessage = d => { if (d && d.a && d.b) celebrate(String(d.a).slice(0, 10), String(d.b).slice(0, 10)); };
     room.onPeerJoin = id => { net.peers.add(id); if (joined) net.st.send(myState(), { target: id }); updateOnline(); };
     room.onPeerLeave = id => { net.peers.delete(id); removeEntity(id); updateOnline(); };
     window.__mgr = { net, players };
@@ -278,7 +281,7 @@ function onState(pid, d) {
     if (role === 'chase') { e.x = e.tx = +d.x || 9; e.z = e.tz = +d.z || 0; }
     setRole(e, role, d.h);
   }
-  e.tx = +d.x || 0; e.tz = +d.z || 0; e.tf = +d.f || 0; e.wave = d.w ? 1 : 0;
+  e.tx = +d.x || 0; e.tz = +d.z || 0; e.tf = +d.f || 0; e.wave = d.w ? 1 : 0; e.rest = !!d.rs;
   if (e.fresh) { e.x = e.tx; e.z = e.tz; e.face = e.tf; e.fresh = false; }
   updateOnline();
 }
@@ -296,20 +299,54 @@ function onShout(pid, d) {
 function onReply(pid, d) {
   const e = d.npc ? npc : players.get(pid); if (!e) return;
   bubble(e, String(d.text || '').slice(0, 40), 2.4, true);
-  if (net && d.to === net.selfId && /좋아/.test(d.text)) showBanner(`${e.name}: 좋아!`, '울타리 밖까지 들렸어요', 2.4);
-}
-function onLove(pid, d) {
-  const e = players.get(pid);
-  if (net && e && d.to === net.selfId) showBanner(`${e.name}님이`, '한 바퀴 내내 옆에서 달렸어요', 2.4);
+  if (net && d.to === net.selfId && /좋아/.test(d.text) && !gotYes(e)) showBanner(`${e.name}: 좋아!`, '울타리 밖까지 들렸어요', 2.4);
 }
 
 // ---------------------------------------------------------------- UI
 const banner = $('banner'), toast = $('toast');
-let bannerT = 0, toastT = 0, lastAsker = null, askT = 0;
+let bannerT = 0, toastT = 0, lastAsker = null, askT = 0, loveT = 0;
+
+// ---- love event: a chaser who gets YES_GOAL answers of "좋아" from the same rider announces it to everyone
+const YES_GOAL = 10;
+const yesCount = new Map(), pending = new Set();
+function gotYes(rider) {
+  const key = rider.npc ? NPC : rider.id;
+  if (!pending.has(key)) return false;          // only an answer to my own shout counts, once per shout
+  pending.delete(key);
+  const n = (yesCount.get(key) || 0) + 1;
+  if (n >= YES_GOAL) {
+    yesCount.delete(key);
+    celebrate(me.name, rider.name);
+    send('ev', { a: me.name, b: rider.name });
+    return true;
+  }
+  yesCount.set(key, n);
+  showToast(`${rider.name}님의 확답 ${n} / ${YES_GOAL}`, 2);
+  return false;
+}
+function celebrate(a, b) {
+  showBanner('', '회전목마가 두 사람을 축하하고 있어요', 6);
+  const nw = t => { const sp = document.createElement('span'); sp.style.whiteSpace = 'nowrap'; sp.textContent = t; return sp; };
+  banner.prepend(nw(`${a}님과`), ' ', nw(`${b}님이`), ' ', nw('사랑에 빠지셨습니다'));
+  toast.hidden = true; toastT = 0;
+  banner.classList.add('love'); loveT = 6;
+  const rain = $('hearts'); rain.textContent = '';
+  if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    for (let i = 0; i < 36; i++) {
+      const h = document.createElement('span'); h.textContent = '♥';
+      h.style.left = Math.random() * 100 + '%';
+      h.style.fontSize = 14 + Math.random() * 26 + 'px';
+      h.style.animationDelay = Math.random() * 2.5 + 's';
+      h.style.animationDuration = 3 + Math.random() * 2 + 's';
+      rain.append(h);
+    }
+  }
+  rain.hidden = false;
+}
 function showBanner(big, small, sec) {
   banner.textContent = big;
   if (small) { const s = document.createElement('small'); s.textContent = small; banner.append(s); }
-  banner.hidden = false; bannerT = sec;
+  banner.classList.remove('love'); banner.hidden = false; bannerT = sec;
 }
 function showToast(t, sec = 2) { toast.textContent = t; toast.hidden = false; toastT = sec; }
 function bubble(e, text, sec, reply) { e.bubble.textContent = text; e.bubble.classList.toggle('r', !!reply); e.bubble.hidden = false; e.bubbleT = sec; }
@@ -325,7 +362,7 @@ function pickHorse() {
 function becomeRider() {
   const h = pickHorse();
   if (h < 0) { showToast('빈 목마가 없어요. 잠시 뒤에 다시 시도해 주세요'); return false; }
-  setRole(me, 'ride', h); heart = 0; refreshControls(); send('st', myState());
+  setRole(me, 'ride', h); refreshControls(); send('st', myState());
   showBanner('탑승!', '밖에서 부르면 대답해 주세요', 1.8);
   return true;
 }
@@ -398,12 +435,18 @@ const runBtn = $('run');
 runBtn.addEventListener('pointerdown', e => { sprintHeld = true; runBtn.classList.add('on'); runBtn.setPointerCapture(e.pointerId); });
 const runEnd = () => { sprintHeld = false; runBtn.classList.remove('on'); };
 runBtn.addEventListener('pointerup', runEnd); runBtn.addEventListener('pointercancel', runEnd);
+$('rest').addEventListener('pointerdown', e => {
+  e.preventDefault();
+  if (!joined || me.role !== 'chase') return;
+  me.rest = !me.rest; me.vx = me.vz = 0; send('st', myState());
+});
 // pointerdown, not click: a phone only fires click for a lone finger, so it never arrives while the other thumb is on the joystick
 $('shout').addEventListener('pointerdown', e => { e.preventDefault(); shout(); });
 
+const yesOf = key => yesCount.get(key) || 0;
 function riderNear(px, pz) {
   const pr = Math.hypot(px, pz), ap = Math.atan2(pz, px);
-  let best = null, bg = 0.5;
+  let best = null, bg = Math.max(0.28, 0.5 - yesOf(focusKey) * 0.022);  // "beside" gets narrower as you close in
   if (pr > 11.5) return null;
   for (const p of players.values()) {
     if (p.role !== 'ride' || p.self) continue;
@@ -416,30 +459,35 @@ let shoutCool = 0;
 function shout() {
   if (!joined || me.role !== 'chase' || shoutCool > 0) return;
   shoutCool = 0.8;
-  const t = riderNear(me.x, me.z);
+  const near = riderNear(me.x, me.z);
+  const running = (me.spd || 0) > 2;
+  const t = near && running ? near : null;
   const text = t ? `${t.name} 너 나 좋아 싫어?!` : '너 나 좋아 싫어?!';
   bubble(me, text, 2.2);
-  const toId = t ? (t.npc ? NPC : t.id) : null;
-  send('sh', { text, to: toId });
+  send('sh', { text, to: t ? (t.npc ? NPC : t.id) : null });
+  if (t) { focusKey = t.npc ? NPC : t.id; pending.add(focusKey); }
   if (t && t.npc) {
     setTimeout(() => {
-      const r = ['좋아!', '따라와 봐!', '한 바퀴만 더!', '뭐야 진짜~', '…생각해 볼게'];
-      const text2 = `${me.name}, ${r[Math.floor(Math.random() * r.length)]}`;
+      const n = yesOf(NPC);
+      const yes = Math.random() < 0.2 + n * 0.07;          // she warms up as confirmations pile up
+      const pool = yes ? ['좋아!', '좋아, 따라와 봐!', '좋아… 아마도'] : ['몰라~', '싫어!', '한 바퀴만 더!', '뭐야 진짜~'];
+      const text2 = `${me.name}, ${pool[Math.floor(Math.random() * pool.length)]}`;
       bubble(npc, text2, 2.2, true); send('rp', { text: text2, npc: 1 });
-      heart = Math.min(100, heart + 15);
+      if (yes) gotYes(npc); else pending.delete(NPC);
     }, 600);
-  } else if (t) {
-    heart = Math.min(100, heart + 8);
-  } else {
-    showToast('목마 가까이 가서 외쳐야 이름이 붙어요', 1.6);
+  } else if (near && !running) {
+    if (near.npc) { bubble(npc, '안 들려~ 같이 달려야지!', 1.8, true); send('rp', { text: '안 들려~ 같이 달려야지!', npc: 1 }); }
+    showToast('멈춰 있으면 안 들려요. 옆에서 같이 달리며 외쳐 보세요', 2);
+  } else if (!near) {
+    showToast('목마 옆에 붙어서 외쳐야 이름이 붙어요', 1.6);
   }
 }
 
 // ---------------------------------------------------------------- loop
 const clock = new THREE.Clock();
 const camPos = new THREE.Vector3(18, 6, 6), camLook = new THREE.Vector3(), tmp = new THREE.Vector3(), fwd = new THREE.Vector3();
-let heart = 0, stamina = 100, loveCool = 0, sendT = 0, conflictT = 0;
-const heartBar = document.querySelector('#heart > i'), stamBar = document.querySelector('#stam > i'), hintEl = $('hint');
+let stamina = 100, sendT = 0, conflictT = 0, focusKey = NPC;
+const yesBar = document.querySelector('#heart > i'), yesLbl = $('yesLbl'), stamBar = document.querySelector('#stam > i'), hintEl = $('hint');
 function wrap(a) { while (a > Math.PI) a -= Math.PI * 2; while (a < -Math.PI) a += Math.PI * 2; return a; }
 
 function place(el, v, dy, maxD) {
@@ -455,11 +503,18 @@ function place(el, v, dy, maxD) {
 function animateWalker(e, dt, speed) {
   const p = e.person;
   e.walk += speed * dt * 1.6;
+  e.restK += ((e.rest && speed < 1 ? 1 : 0) - e.restK) * Math.min(1, dt * 6);
+  const rk = e.restK, wk = 1 - rk;
   const k = Math.min(1, speed / 5), sw = Math.sin(e.walk) * k * 0.9;
-  p.legs[0].rotation.x = sw; p.legs[1].rotation.x = -sw;
-  p.arms[0].rotation.x = -sw; p.arms[1].rotation.x = sw;
-  p.g.position.set(e.x, Math.abs(Math.cos(e.walk)) * k * 0.12, e.z);
-  p.scarf.rotation.x = 0.2 + Math.min(1, speed / 8) * 1.1 + Math.sin(performance.now() / 70) * 0.08 * k;
+  // panting: hands on knees, back heaving fast
+  const pant = Math.sin(performance.now() / 1000 * 8.5 + e.walk);
+  p.upper.rotation.x = rk * (0.62 + pant * 0.07);
+  p.upper.position.y = 0.9 - rk * 0.1 + rk * pant * 0.02;
+  p.legs[0].rotation.x = sw * wk - rk * 0.22; p.legs[1].rotation.x = -sw * wk + rk * 0.08;
+  p.arms[0].rotation.x = -sw * wk - rk * 0.55; p.arms[1].rotation.x = sw * wk - rk * 0.55;
+  p.arms[0].rotation.z = -rk * 0.12; p.arms[1].rotation.z = rk * 0.12;
+  p.g.position.set(e.x, Math.abs(Math.cos(e.walk)) * k * 0.12 * wk, e.z);
+  p.scarf.rotation.x = 0.2 + Math.min(1, speed / 8) * 1.1 + Math.sin(performance.now() / 70) * 0.08 * k + rk * 0.6;
   const df = wrap(e.face - p.g.rotation.y); p.g.rotation.y += df * Math.min(1, dt * 12);
   e.blob.position.set(e.x, 0.02, e.z);
 }
@@ -471,7 +526,9 @@ function tick() {
   spin.rotation.y = (t * OMEGA) % (Math.PI * 2);
   horses.forEach(o => { o.h.position.y = 1.55 + Math.sin(t * 2.2 + o.phase) * 0.35; });
   const on = Math.floor(t / 0.35) % 2;
-  bulbMatA.color.setHex(on ? 0xffe2a0 : 0x8a6020); bulbMatB.color.setHex(on ? 0x8a6020 : 0xffe2a0);
+  const hi = loveT > 0 ? 0xff7ab0 : 0xffe2a0, lo = loveT > 0 ? 0x8a2050 : 0x8a6020;
+  bulbMatA.color.setHex(on ? hi : lo); bulbMatB.color.setHex(on ? lo : hi);
+  if (loveT > 0) { loveT -= dt; if (loveT <= 0) { $('hearts').hidden = true; banner.classList.remove('love'); } }
 
   // rider world positions
   for (const p of players.values()) if (p.role === 'ride') p.person.g.getWorldPosition(p.wp);
@@ -482,8 +539,10 @@ function tick() {
     if (keys.KeyA || keys.ArrowLeft) ix -= 1; if (keys.KeyD || keys.ArrowRight) ix += 1;
     if (keys.KeyW || keys.ArrowUp) iy -= 1; if (keys.KeyS || keys.ArrowDown) iy += 1;
     const mag = Math.min(1, Math.hypot(ix, iy));
+    if (mag > 0.1 && me.rest) { me.rest = false; send('st', myState()); }
     const sprinting = (sprintHeld || keys.ShiftLeft || keys.ShiftRight) && stamina > 0 && mag > 0.1;
-    stamina = sprinting ? Math.max(0, stamina - 24 * dt) : Math.min(100, stamina + 14 * dt);
+    const drain = 24 * (1 + yesOf(focusKey) * 0.06);
+    stamina = sprinting ? Math.max(0, stamina - drain * dt) : Math.min(100, stamina + (me.rest ? 34 : 14) * dt);
     const speed = sprinting ? 10.5 : 6.2;
     camera.getWorldDirection(fwd); fwd.y = 0; fwd.normalize();
     const rx = -fwd.z, rz = fwd.x;
@@ -497,19 +556,17 @@ function tick() {
     if (pr > rMax) { me.x *= rMax / pr; me.z *= rMax / pr; pr = rMax; }
     const s = Math.hypot(me.vx, me.vz);
     if (s > 0.3) me.face = Math.atan2(me.vx, me.vz);
+    me.spd = s;
     animateWalker(me, dt, s);
 
     const near = riderNear(me.x, me.z);
-    heart = near ? Math.min(100, heart + 20 * dt) : Math.max(0, heart - 7 * dt);
-    if (heart >= 100 && near) {
-      heart = 0;
-      showBanner(`${near.name} 옆 한 바퀴!`, '마음 게이지가 가득 찼어요', 2.2);
-      if (near.npc) { bubble(npc, `${me.name}, 좋아!!`, 2.4, true); send('rp', { text: `${me.name}, 좋아!!`, npc: 1 }); }
-      else send('lv', { to: near.id });
-    }
-    hintEl.textContent = near ? `지금 ${near.name} 옆이에요. 외쳐 보세요!`
-      : stamina < 15 ? '숨이 차요… 체력이 돌아올 때까지 걸으세요' : '목마 위 이름표를 따라 달리세요';
-    heartBar.style.width = heart + '%'; stamBar.style.width = stamina + '%';
+    hintEl.textContent = me.rest ? '숨 고르는 중… 움직이면 다시 달려요'
+      : near && s > 2 ? `지금 ${near.name} 옆이에요. 외쳐 보세요!`
+      : near ? '같이 달리면서 외쳐야 들려요'
+      : stamina < 15 ? '숨이 차요… 쉬기를 눌러 체력을 채우세요' : '목마 위 이름표를 따라 달리세요';
+    const fe = entityByNetId(focusKey) || npc, fn = yesOf(focusKey);
+    yesLbl.textContent = `확답 ${fn}/${YES_GOAL}`; yesLbl.title = fe.name;
+    yesBar.style.width = fn / YES_GOAL * 100 + '%'; stamBar.style.width = stamina + '%';
 
     // camera behind me, looking at the carousel
     const ox = me.x / pr, oz = me.z / pr;
