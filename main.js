@@ -248,8 +248,13 @@ let net = null;
 const onlineEl = $('online');
 function updateOnline() {
   if (!net) { onlineEl.textContent = navigator.onLine === false ? '오프라인 · 혼자 모드' : '연결 중…'; return; }
-  const n = net.peers.size + 1;
-  onlineEl.textContent = `${roomLabel()} · ${n}명 접속` + (n === 1 ? ' (다른 사람을 찾는 중…)' : '');
+  // people who are actually in the park vs. people still on the entry screen (connected, not yet joined)
+  const inPark = [...players.values()].filter(p => !p.self && !p.npc).length;
+  const waiting = Math.max(0, net.peers.size - inPark);
+  const playing = inPark + (joined ? 1 : 0);
+  onlineEl.textContent = `${roomLabel()} · ${playing}명 플레이 중`
+    + (waiting ? ` · ${waiting}명 입장 화면` : '')
+    + (!inPark && !waiting ? ' (다른 사람을 찾는 중…)' : '');
 }
 function myState() {
   return { n: me.name, r: me.role, h: me.horse, x: +me.x.toFixed(2), z: +me.z.toFixed(2), f: +me.face.toFixed(2), w: me.wave > 0 ? 1 : 0, rs: me.rest ? 1 : 0, hc: isHost ? 1 : 0 };
@@ -433,6 +438,7 @@ $('joinForm').addEventListener('submit', ev => {
   if (code.length === 4 && !isHost && role === 'chase') seekHost = 10;
   joined = true;
   me.person.g.visible = true; me.tag.hidden = false; me.blob.visible = true;
+  updateOnline();
   $('intro').hidden = true;
   if (role === 'ride' && becomeRider()) {} else { becomeChaser(); showBanner('달려!', '목마 위 이름을 보고 쫓아가세요', 1.8); }
   send('st', myState());
@@ -665,8 +671,9 @@ function tick() {
     if (p.role !== 'ride') continue;
     const waving = p.npc ? (me.role === 'chase' && joined && riderNear(me.x, me.z) === npc) : p.wave > 0;
     const a = p.person.arms;
-    a[0].rotation.set(-0.6, 0, 0.3);
-    a[1].rotation.set(0, 0, waving ? -2.6 + Math.sin(t * 9) * 0.35 : -0.2);
+    // the right hand (arms[0]) is on the outside of the carousel, facing the people running round it
+    a[1].rotation.set(-0.6, 0, -0.3);
+    a[0].rotation.set(0, 0, waving ? -2.5 + Math.sin(t * 9) * 0.35 : -0.15);   // negative z lifts this arm out to the side
   }
   if (me.wave > 0) { me.wave -= dt; if (me.wave <= 0) send('st', myState()); }
 
@@ -686,8 +693,6 @@ function tick() {
   if (shoutCool > 0) shoutCool -= dt;
 
   // network: send my state, settle horse clashes
-  sendT -= dt;
-  if (sendT <= 0 && joined) { sendT = 0.12; send('st', myState()); }
   conflictT -= dt;
   if (conflictT <= 0 && joined && me.role === 'ride' && net) {
     conflictT = 1;
@@ -704,4 +709,6 @@ function tick() {
 refreshControls();
 $('chaseCtl').hidden = true; $('rideCtl').hidden = true; $('meters').hidden = true;
 requestAnimationFrame(tick);
+// a timer instead of the frame loop, so a phone that goes to the background still shows up for others
+setInterval(() => { if (joined) send('st', myState()); }, 150);
 connect();
