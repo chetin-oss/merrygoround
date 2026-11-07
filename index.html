@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>공포의 회전목마</title>
+<meta name="description" content="회전목마에 타거나, 울타리 밖에서 달려 쫓아가는 멀티플레이 3D 놀이공원">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Gowun+Dodum&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<canvas id="stage"></canvas>
+<div id="labels"></div>
+
+<div class="hud-top">
+  <div class="title-row">
+    <h1>공포의 회전목마</h1>
+    <span class="online" id="online">연결 중…</span>
+  </div>
+  <div class="meters" id="meters">
+    <label>마음</label><div class="bar" id="heart"><i></i></div>
+    <label>체력</label><div class="bar" id="stam"><i></i></div>
+  </div>
+  <div class="hint" id="hint"></div>
+</div>
+
+<div class="top-right">
+  <button class="chip" id="music" type="button">음악 켜기</button>
+  <button class="chip" id="switchRole" type="button">회전목마 타기</button>
+  <button class="chip" id="share" type="button">링크 복사</button>
+</div>
+
+<div class="controls" id="chaseCtl" hidden>
+  <div id="joy" aria-label="이동 조이스틱"><div id="knob"></div></div>
+  <div class="btns">
+    <button class="btn" id="shout" type="button">너 나 좋아 싫어?!</button>
+    <button class="btn" id="run" type="button">전력질주</button>
+  </div>
+</div>
+
+<div class="controls ride" id="rideCtl" hidden>
+  <div class="asked" id="asked">밖에서 누가 부르면 여기에 이름이 떠요</div>
+  <div class="replies">
+    <button class="btn reply" data-say="좋아!" type="button">좋아!</button>
+    <button class="btn reply" data-say="싫어!" type="button">싫어!</button>
+    <button class="btn reply" data-say="몰라~" type="button">몰라~</button>
+    <button class="btn wave" id="wave" type="button">손 흔들기</button>
+  </div>
+</div>
+
+<div id="banner" hidden></div>
+<div id="toast" hidden></div>
+
+<div id="intro">
+  <form class="card" id="joinForm">
+    <h2>회전목마는 멈추지 않는다</h2>
+    <p>같은 링크로 들어온 사람들이 한 놀이공원에 모입니다. 목마에 올라탈지, 울타리 밖에서 쫓아갈지 고르세요.</p>
+    <label class="field" for="nameIn">내 이름
+      <input id="nameIn" maxlength="10" autocomplete="nickname" placeholder="예: 송주">
+    </label>
+    <div class="roles">
+      <button class="role" id="joinChase" type="submit" value="chase">
+        <b>쫓아가기</b><span>울타리 밖에서 달리며<br>"너 나 좋아 싫어?!"</span>
+      </button>
+      <button class="role" id="joinRide" type="submit" value="ride">
+        <b>회전목마 타기</b><span>머리 위에 이름이 뜨고<br>부르면 대답할 수 있어요</span>
+      </button>
+    </div>
+    <p class="small" id="roomInfo"></p>
+  </form>
+</div>
+
+<script type="module" src="main.js"></script>
+</body>
+</html>
