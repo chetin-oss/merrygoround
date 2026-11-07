@@ -251,11 +251,12 @@ async function connect() {
       onJoinError: d => { console.warn('peer join error', d); showToast('다른 사람과 직접 연결이 안 돼요 (네트워크 차단). 와이파이를 바꿔 보세요', 4); },
     });
     net = { room, selfId: T.selfId, peers: new Set(),
-      st: room.makeAction('st'), sh: room.makeAction('sh'), rp: room.makeAction('rp'), lv: room.makeAction('lv') };
+      st: room.makeAction('st'), sh: room.makeAction('sh'), rp: room.makeAction('rp'), lv: room.makeAction('lv'), ev: room.makeAction('ev') };
     net.st.onMessage = (d, { peerId }) => onState(peerId, d);
     net.sh.onMessage = (d, { peerId }) => onShout(peerId, d);
     net.rp.onMessage = (d, { peerId }) => onReply(peerId, d);
     net.lv.onMessage = (d, { peerId }) => onLove(peerId, d);
+    net.ev.onMessage = d => { if (d && d.a && d.b) celebrate(String(d.a).slice(0, 10), String(d.b).slice(0, 10)); };
     room.onPeerJoin = id => { net.peers.add(id); if (joined) net.st.send(myState(), { target: id }); updateOnline(); };
     room.onPeerLeave = id => { net.peers.delete(id); removeEntity(id); updateOnline(); };
     window.__mgr = { net, players };
@@ -296,7 +297,7 @@ function onShout(pid, d) {
 function onReply(pid, d) {
   const e = d.npc ? npc : players.get(pid); if (!e) return;
   bubble(e, String(d.text || '').slice(0, 40), 2.4, true);
-  if (net && d.to === net.selfId && /좋아/.test(d.text)) showBanner(`${e.name}: 좋아!`, '울타리 밖까지 들렸어요', 2.4);
+  if (net && d.to === net.selfId && /좋아/.test(d.text) && !gotYes(e)) showBanner(`${e.name}: 좋아!`, '울타리 밖까지 들렸어요', 2.4);
 }
 function onLove(pid, d) {
   const e = players.get(pid);
@@ -305,11 +306,49 @@ function onLove(pid, d) {
 
 // ---------------------------------------------------------------- UI
 const banner = $('banner'), toast = $('toast');
-let bannerT = 0, toastT = 0, lastAsker = null, askT = 0;
+let bannerT = 0, toastT = 0, lastAsker = null, askT = 0, loveT = 0;
+
+// ---- love event: a chaser who gets YES_GOAL answers of "좋아" from the same rider announces it to everyone
+const YES_GOAL = 10;
+const yesCount = new Map(), pending = new Set();
+function gotYes(rider) {
+  const key = rider.npc ? NPC : rider.id;
+  if (!pending.has(key)) return false;          // only an answer to my own shout counts, once per shout
+  pending.delete(key);
+  const n = (yesCount.get(key) || 0) + 1;
+  if (n >= YES_GOAL) {
+    yesCount.delete(key);
+    celebrate(me.name, rider.name);
+    send('ev', { a: me.name, b: rider.name });
+    return true;
+  }
+  yesCount.set(key, n);
+  showToast(`${rider.name}님의 확답 ${n} / ${YES_GOAL}`, 2);
+  return false;
+}
+function celebrate(a, b) {
+  showBanner('', '회전목마가 두 사람을 축하하고 있어요', 6);
+  const nw = t => { const sp = document.createElement('span'); sp.style.whiteSpace = 'nowrap'; sp.textContent = t; return sp; };
+  banner.prepend(nw(`${a}님과`), ' ', nw(`${b}님이`), ' ', nw('사랑에 빠지셨습니다'));
+  toast.hidden = true; toastT = 0;
+  banner.classList.add('love'); loveT = 6;
+  const rain = $('hearts'); rain.textContent = '';
+  if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    for (let i = 0; i < 36; i++) {
+      const h = document.createElement('span'); h.textContent = '♥';
+      h.style.left = Math.random() * 100 + '%';
+      h.style.fontSize = 14 + Math.random() * 26 + 'px';
+      h.style.animationDelay = Math.random() * 2.5 + 's';
+      h.style.animationDuration = 3 + Math.random() * 2 + 's';
+      rain.append(h);
+    }
+  }
+  rain.hidden = false;
+}
 function showBanner(big, small, sec) {
   banner.textContent = big;
   if (small) { const s = document.createElement('small'); s.textContent = small; banner.append(s); }
-  banner.hidden = false; bannerT = sec;
+  banner.classList.remove('love'); banner.hidden = false; bannerT = sec;
 }
 function showToast(t, sec = 2) { toast.textContent = t; toast.hidden = false; toastT = sec; }
 function bubble(e, text, sec, reply) { e.bubble.textContent = text; e.bubble.classList.toggle('r', !!reply); e.bubble.hidden = false; e.bubbleT = sec; }
@@ -421,11 +460,13 @@ function shout() {
   bubble(me, text, 2.2);
   const toId = t ? (t.npc ? NPC : t.id) : null;
   send('sh', { text, to: toId });
+  if (t) pending.add(t.npc ? NPC : t.id);
   if (t && t.npc) {
     setTimeout(() => {
-      const r = ['좋아!', '따라와 봐!', '한 바퀴만 더!', '뭐야 진짜~', '…생각해 볼게'];
+      const r = ['좋아!', '좋아, 따라와 봐!', '한 바퀴만 더!', '좋아… 아마도', '뭐야 진짜~'];
       const text2 = `${me.name}, ${r[Math.floor(Math.random() * r.length)]}`;
       bubble(npc, text2, 2.2, true); send('rp', { text: text2, npc: 1 });
+      if (/좋아/.test(text2)) gotYes(npc); else pending.delete(NPC);
       heart = Math.min(100, heart + 15);
     }, 600);
   } else if (t) {
@@ -471,7 +512,9 @@ function tick() {
   spin.rotation.y = (t * OMEGA) % (Math.PI * 2);
   horses.forEach(o => { o.h.position.y = 1.55 + Math.sin(t * 2.2 + o.phase) * 0.35; });
   const on = Math.floor(t / 0.35) % 2;
-  bulbMatA.color.setHex(on ? 0xffe2a0 : 0x8a6020); bulbMatB.color.setHex(on ? 0x8a6020 : 0xffe2a0);
+  const hi = loveT > 0 ? 0xff7ab0 : 0xffe2a0, lo = loveT > 0 ? 0x8a2050 : 0x8a6020;
+  bulbMatA.color.setHex(on ? hi : lo); bulbMatB.color.setHex(on ? lo : hi);
+  if (loveT > 0) { loveT -= dt; if (loveT <= 0) { $('hearts').hidden = true; banner.classList.remove('love'); } }
 
   // rider world positions
   for (const p of players.values()) if (p.role === 'ride') p.person.g.getWorldPosition(p.wp);
