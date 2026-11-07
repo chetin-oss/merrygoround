@@ -398,7 +398,8 @@ const runBtn = $('run');
 runBtn.addEventListener('pointerdown', e => { sprintHeld = true; runBtn.classList.add('on'); runBtn.setPointerCapture(e.pointerId); });
 const runEnd = () => { sprintHeld = false; runBtn.classList.remove('on'); };
 runBtn.addEventListener('pointerup', runEnd); runBtn.addEventListener('pointercancel', runEnd);
-$('shout').addEventListener('click', shout);
+// pointerdown, not click: a phone only fires click for a lone finger, so it never arrives while the other thumb is on the joystick
+$('shout').addEventListener('pointerdown', e => { e.preventDefault(); shout(); });
 
 function riderNear(px, pz) {
   const pr = Math.hypot(px, pz), ap = Math.atan2(pz, px);

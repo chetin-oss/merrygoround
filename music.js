@@ -93,16 +93,38 @@ function schedule() {
   }
 }
 
+// Older iPhones mute web audio on the silent switch unless an <audio> element is playing,
+// so loop a silent clip alongside the synth.
+let tag = null;
+function unlockTag() {
+  if (tag) return;
+  const n = 4410, buf = new ArrayBuffer(44 + n * 2), v = new DataView(buf);
+  const w = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+  w(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); w(8, 'WAVEfmt '); v.setUint32(16, 16, true);
+  v.setUint16(20, 1, true); v.setUint16(22, 1, true); v.setUint32(24, 44100, true); v.setUint32(28, 88200, true);
+  v.setUint16(32, 2, true); v.setUint16(34, 16, true); w(36, 'data'); v.setUint32(40, n * 2, true);
+  tag = new Audio(URL.createObjectURL(new Blob([buf], { type: 'audio/wav' })));
+  tag.loop = true; tag.setAttribute('playsinline', '');
+  tag.play().catch(() => {});
+}
+
 export const Music = {
   toggle() {
     try {
+      // iPhone: let web audio play even with the silent switch on (Safari 16.4+)
+      try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) {}
       if (!ctx) setup();
       ctx.resume();
+      // iPhone/Android unlock: start one silent sample inside the tap itself
+      const b = ctx.createBuffer(1, 1, 22050), s = ctx.createBufferSource();
+      s.buffer = b; s.connect(ctx.destination); s.start(0);
+      unlockTag();
       on = !on;
       const t = ctx.currentTime;
       master.gain.cancelScheduledValues(t);
       master.gain.setTargetAtTime(on ? 0.9 : 0, t, 0.3);
       if (on && next < t) { next = t + 0.1; }
+      if (tag) { if (on) tag.play().catch(() => {}); else tag.pause(); }
     } catch (e) { on = false; }
     return on;
   },
