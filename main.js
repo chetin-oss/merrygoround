@@ -230,7 +230,7 @@ function setRole(e, role, horse) {
 }
 
 // the house rider who is always there
-const npc = makeEntity(NPC, '빨간 코트', { npc: true, coat: 0xe0412f, pants: 0x2a3a6a, longHair: true, long: true, scarfColor: 0xe0412f });
+const npc = makeEntity(NPC, '한정선', { npc: true, coat: 0xe0412f, pants: 0x2a3a6a, longHair: true, long: true, scarfColor: 0xe0412f });
 setRole(npc, 'ride', 0);
 
 // ---- a runner NPC who never stops chasing the red coat.
@@ -266,7 +266,7 @@ function runnerTick(t) {
   const slot = k < 0 ? -1 : Math.floor(t / RUN_CYCLE) * 10 + k;
   if (slot >= 0 && slot !== runnerSlot) {
     runnerSlot = slot;
-    bubble(runner, '빨간 코트 너 나 좋아 싫어?!', 2.2);
+    bubble(runner, '한정선 너 나 좋아 싫어?!', 2.2);
     const answers = ['직진남, 몰라~', '직진남, 싫어!', '직진남, 한 바퀴만 더!', '직진남, 뭐야 진짜~', '직진남, …생각해 볼게'];
     setTimeout(() => bubble(npc, answers[(slot * 7 + 3) % answers.length], 2.2, true), 600);
   }
